@@ -3,7 +3,10 @@ package `in`.jvapps.system_alert_window.services
 import `in`.jvapps.system_alert_window.R
 import `in`.jvapps.system_alert_window.SystemAlertWindowPlugin
 import `in`.jvapps.system_alert_window.models.Margin
-import `in`.jvapps.system_alert_window.utils.*
+import `in`.jvapps.system_alert_window.utils.Commons
+import `in`.jvapps.system_alert_window.utils.Constants
+import `in`.jvapps.system_alert_window.utils.NumberUtils
+import `in`.jvapps.system_alert_window.utils.UiBuilder
 import `in`.jvapps.system_alert_window.views.BodyView
 import `in`.jvapps.system_alert_window.views.FooterView
 import `in`.jvapps.system_alert_window.views.HeaderView
@@ -43,6 +46,15 @@ class WindowServiceNew : Service(), View.OnTouchListener {
     private var originalYPos = 0
     private var moving = false
     private var mContext: Context? = null
+
+    companion object {
+        private val TAG = WindowServiceNew::class.java.simpleName
+        const val CHANNEL_ID = "ForegroundServiceChannel"
+        private const val NOTIFICATION_ID = 1
+        const val INTENT_EXTRA_IS_UPDATE_WINDOW = "IsUpdateWindow"
+        const val INTENT_EXTRA_IS_CLOSE_WINDOW = "IsCloseWindow"
+    }
+
     override fun onCreate() {
         createNotificationChannel()
         val notificationIntent = Intent(this, SystemAlertWindowPlugin::class.java)
@@ -60,22 +72,25 @@ class WindowServiceNew : Service(), View.OnTouchListener {
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         //Toast.makeText(this, "service starting", Toast.LENGTH_SHORT).show();
-        if (null != intent && intent.extras != null) {
-            val paramsMap =
-                intent.getSerializableExtra(Constants.INTENT_EXTRA_PARAMS_MAP) as HashMap<String, Any>?
-            mContext = this
-            val isCloseWindow = intent.getBooleanExtra(INTENT_EXTRA_IS_CLOSE_WINDOW, false)
-            if (!isCloseWindow) {
-                assert(paramsMap != null)
-                val isUpdateWindow = intent.getBooleanExtra(INTENT_EXTRA_IS_UPDATE_WINDOW, false)
-                if (wm != null && isUpdateWindow && windowView != null) {
-                    updateWindow(paramsMap)
-                } else {
-                    createWindow(paramsMap)
-                }
-            } else {
-                closeWindow(true)
-            }
+        if (intent.extras == null) return START_STICKY
+        val paramsMap =
+            intent.getSerializableExtra(Constants.INTENT_EXTRA_PARAMS_MAP) as HashMap<String, Any>?
+        mContext = this
+        val isCloseWindow = intent.getBooleanExtra(INTENT_EXTRA_IS_CLOSE_WINDOW, false)
+
+        Log.d(TAG, "[onStartCommand]is isCloseWindow $isCloseWindow")
+        if (isCloseWindow) {
+            closeWindow(true)
+            return START_NOT_STICKY
+        }
+
+        assert(paramsMap != null)
+        val isUpdateWindow = intent.getBooleanExtra(INTENT_EXTRA_IS_UPDATE_WINDOW, false)
+        Log.d(TAG, "[onStartCommand]is isUpdateWindow $isUpdateWindow")
+        if (wm != null && isUpdateWindow && windowView != null) {
+            updateWindow(paramsMap)
+        } else {
+            createWindow(paramsMap)
         }
         return START_STICKY
     }
@@ -264,11 +279,4 @@ class WindowServiceNew : Service(), View.OnTouchListener {
         return null
     }
 
-    companion object {
-        private val TAG = WindowServiceNew::class.java.simpleName
-        const val CHANNEL_ID = "ForegroundServiceChannel"
-        private const val NOTIFICATION_ID = 1
-        const val INTENT_EXTRA_IS_UPDATE_WINDOW = "IsUpdateWindow"
-        const val INTENT_EXTRA_IS_CLOSE_WINDOW = "IsCloseWindow"
-    }
 }

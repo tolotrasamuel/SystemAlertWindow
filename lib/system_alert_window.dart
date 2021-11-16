@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:system_alert_window/models/system_window_body.dart';
 import 'package:system_alert_window/models/system_window_footer.dart';
 import 'package:system_alert_window/models/system_window_header.dart';
@@ -19,7 +20,6 @@ export 'models/system_window_margin.dart';
 export 'models/system_window_padding.dart';
 export 'models/system_window_text.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
 enum SystemWindowGravity { TOP, BOTTOM, CENTER }
 
 enum ContentGravity { LEFT, RIGHT, CENTER }
@@ -31,12 +31,17 @@ enum FontWeight { NORMAL, BOLD, ITALIC, BOLD_ITALIC }
 enum SystemWindowPrefMode { DEFAULT, OVERLAY, BUBBLE }
 
 typedef void OnClickListener(String tag, Map<String, dynamic>? payload);
+
 const MethodChannel _channel = const MethodChannel(Constants.CHANNEL);
 
 class SystemAlertWindow {
 
-  static late StreamController<Map<String, dynamic>> _isolateBroadcast = StreamController();
-  static Stream<Map<String, dynamic>> get broadcastReceiver => _isolateBroadcast.stream;
+  static late StreamController<
+      Map<String, dynamic>> _isolateBroadcast = StreamController();
+
+  // static Stream<Map<String, dynamic>> get broadcastReceiver =>
+  //     _isolateBroadcast.stream;
+
   static Future<String?> get platformVersion async {
     final String? version = await _channel.invokeMethod('getPlatformVersion');
     return version;
@@ -47,9 +52,11 @@ class SystemAlertWindow {
     return await _channel.invokeMethod(
         'checkPermissions', [Commons.getSystemWindowPrefMode(prefMode)]);
   }
+
   static Future<bool> isIsolateRunning() async {
     return await _channel.invokeMethod('isIsolateRunning');
   }
+
   static Future<bool> connectToRunningIsolate() async {
     return await _channel.invokeMethod('connectToRunningIsolate');
   }
@@ -60,21 +67,22 @@ class SystemAlertWindow {
         'requestPermissions', [Commons.getSystemWindowPrefMode(prefMode)]);
   }
 
-  static Future<Map<String, dynamic>?>sendEventFromFlutterToIsolate (String id, Map<String, dynamic>  payload) async{
-    print("Invoking sendEventFromFlutterToIsolate with ${id} and payload ${payload} ");
+  static Future<Map<String, dynamic>?> sendEventFromFlutterToIsolate(
+        String id,
+        Map<String, dynamic> payload,
+      ) async {
+    print(
+        "Invoking sendEventFromFlutterToIsolate with ${id} and payload ${payload} ");
     final ans = await _channel.invokeMethod(
         'sendEventFromFlutterToIsolate', [id, payload]);
+    if (ans == null) return null;
     return Map<String, dynamic>.from(ans);
   }
-  static Future<bool?> registerOnClickListener(
-      OnClickListener callBackFunction,) async {
-    final mainIsolateEntryPointHandle =
-        PluginUtilities.getCallbackHandle(mainIsolateEntryPoint)!;
-    final callBack = PluginUtilities.getCallbackHandle(callBackFunction)!;
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('callBackFunction', callBack.toRawHandle());
+
+  static Stream<Map<String, dynamic>> broadcastReceiverSubscribe () {
     _channel.setMethodCallHandler((MethodCall call) async {
-      print("Got setMethodCallHandler in flutter ${call.method}");
+      print("Got setMethodCallHandler in flutter ${call
+          .method} and argument ${call.arguments}");
       // if(call.method == "isolateBroadcast"){
       //   print("Adding 0 event to stream from isolateBroadcast ${call} ");
       //   dynamic arguments = call.arguments;
@@ -93,22 +101,31 @@ class SystemAlertWindow {
       }
       return null;
     });
+    return _isolateBroadcast.stream;
+  }
+  static Future<bool?> registerOnClickListener(
+      OnClickListener callBackFunction,) async {
+    final mainIsolateEntryPointHandle =
+    PluginUtilities.getCallbackHandle(mainIsolateEntryPoint)!;
+    final callBack = PluginUtilities.getCallbackHandle(callBackFunction)!;
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('callBackFunction', callBack.toRawHandle());
+
     await _channel.invokeMethod("startIsolate",
         <dynamic>[mainIsolateEntryPointHandle.toRawHandle()]);
     return true;
   }
 
-  static Future<bool?> showSystemWindow(
-      {required SystemWindowHeader header,
-      SystemWindowBody? body,
-      SystemWindowFooter? footer,
-      SystemWindowMargin? margin,
-      SystemWindowGravity gravity = SystemWindowGravity.CENTER,
-      int? width,
-      int? height,
-      String notificationTitle = "Title",
-      String notificationBody = "Body",
-      SystemWindowPrefMode prefMode = SystemWindowPrefMode.DEFAULT}) async {
+  static Future<bool?> showSystemWindow({required SystemWindowHeader header,
+    SystemWindowBody? body,
+    SystemWindowFooter? footer,
+    SystemWindowMargin? margin,
+    SystemWindowGravity gravity = SystemWindowGravity.CENTER,
+    int? width,
+    int? height,
+    String notificationTitle = "Title",
+    String notificationBody = "Body",
+    SystemWindowPrefMode prefMode = SystemWindowPrefMode.DEFAULT}) async {
     assert(header != null);
     final Map<String, dynamic> params = <String, dynamic>{
       'header': header.getMap(),
@@ -127,17 +144,16 @@ class SystemAlertWindow {
     ]);
   }
 
-  static Future<bool?> updateSystemWindow(
-      {required SystemWindowHeader header,
-      SystemWindowBody? body,
-      SystemWindowFooter? footer,
-      SystemWindowMargin? margin,
-      SystemWindowGravity gravity = SystemWindowGravity.CENTER,
-      int? width,
-      int? height,
-      String notificationTitle = "Title",
-      String notificationBody = "Body",
-      SystemWindowPrefMode prefMode = SystemWindowPrefMode.DEFAULT}) async {
+  static Future<bool?> updateSystemWindow({required SystemWindowHeader header,
+    SystemWindowBody? body,
+    SystemWindowFooter? footer,
+    SystemWindowMargin? margin,
+    SystemWindowGravity gravity = SystemWindowGravity.CENTER,
+    int? width,
+    int? height,
+    String notificationTitle = "Title",
+    String notificationBody = "Body",
+    SystemWindowPrefMode prefMode = SystemWindowPrefMode.DEFAULT}) async {
     assert(header != null);
     final Map<String, dynamic> params = <String, dynamic>{
       'header': header.getMap(),
@@ -166,6 +182,7 @@ class SystemAlertWindow {
 class SystemAlertWindowFromIsolate {
 
   static Future<bool> broadcastFromIsolate(Map<String, dynamic> payload) async {
+    print("Broadcast event to app from isolate $payload");
     return await _channel.invokeMethod(
         'broadcastFromIsolate', [payload]);
   }
@@ -173,26 +190,29 @@ class SystemAlertWindowFromIsolate {
 }
 
 int? callBackHandle;
+
 void mainIsolateEntryPoint() {
   // 1. Initialize MethodChannel used to communicate with the platform portion of the plugin
   const MethodChannel _backgroundChannel =
-      const MethodChannel(Constants.BACKGROUND_CHANNEL);
+  const MethodChannel(Constants.BACKGROUND_CHANNEL);
   // 2. Setup internal state needed for MethodChannels.
   WidgetsFlutterBinding.ensureInitialized();
 
   // 3. Listen for background events from the platform portion of the plugin.
   _backgroundChannel.setMethodCallHandler((MethodCall call) async {
     final args = call.arguments;
-    print("FlutterIsolate _backgroundChannel in flutter Method channel received:  ${call.method} with $args");
+    print(
+        "FlutterIsolate _backgroundChannel in flutter Method channel received:  ${call
+            .method} with $args");
 
-    if (callBackHandle == null){
+    if (callBackHandle == null) {
       print("D1");
-      try{
+      try {
         SharedPreferences prefs = await SharedPreferences.getInstance();
 
         print("D2");
         callBackHandle = prefs.getInt('callBackFunction')!;
-      }catch(e){
+      } catch (e) {
         print("D1ER");
         print(e);
       }

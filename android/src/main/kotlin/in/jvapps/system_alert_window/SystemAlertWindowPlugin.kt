@@ -198,7 +198,7 @@ class SystemAlertWindowPlugin private constructor(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         var prefMode: String?
         val arguments: List<*>
-        Log.d(TAG, "onMethodCall is System Alert Window ${call.method}")
+        Log.d(TAG, "onMethodCall is System Alert Window ${call.method} and payload ${call.arguments}")
 
         when (call.method) {
             "getPlatformVersion" -> result.success("Android " + Build.VERSION.RELEASE)
@@ -237,6 +237,8 @@ class SystemAlertWindowPlugin private constructor(
             "broadcastFromIsolate" -> {
                 arguments = call.arguments as List<*>
                 val payload = arguments[0]
+                Log.d(TAG, "Android is invoking Method channel=isolateBroadcast on methodChannel with  $payload")
+
                 methodChannel!!.invokeMethod("isolateBroadcast", payload)
                 return result.success(true)
             }
